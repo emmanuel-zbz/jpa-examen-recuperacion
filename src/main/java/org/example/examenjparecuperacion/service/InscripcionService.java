@@ -1,16 +1,15 @@
 package org.example.examenjparecuperacion.service;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.examenjparecuperacion.domain.Alumno;
 import org.example.examenjparecuperacion.domain.Curso;
 import org.example.examenjparecuperacion.dto.AlumnoInscripcionResponseDTO;
-import org.example.examenjparecuperacion.dto.CursoInscritoDTO;
+import org.example.examenjparecuperacion.mapper.InscripcionMapper;
 import org.example.examenjparecuperacion.repository.AlumnoRepository;
 import org.example.examenjparecuperacion.repository.CursoRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,6 +21,8 @@ public class InscripcionService {
     private final AlumnoRepository alumnoRepository;
     private final CursoRepository cursoRepository;
 
+    private final InscripcionMapper inscripcionMapper;
+
     @Transactional
     public AlumnoInscripcionResponseDTO inscribirAlumnoEnCurso(Long alumnoId, Long cursoId) {
         Alumno alumno = obtenerAlumnoPorId(alumnoId);
@@ -29,52 +30,33 @@ public class InscripcionService {
 
         hacerVinculacion(alumno, curso);
 
-        return construirDTO(alumno);
+        BigDecimal totalInversion = calcularInversionTotal(alumno.getCursos());
+
+        return inscripcionMapper.toResponseDto(alumno, totalInversion);
     }
 
     private Alumno obtenerAlumnoPorId(Long alumnoId) {
         return alumnoRepository.findById(alumnoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alumno no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Alumno no encontrado con ID: " + alumnoId));
     }
 
     private Curso obtenerCursoPorId(Long cursoId) {
         return cursoRepository.findById(cursoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curso no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Curso no encontrado con ID: " + cursoId));
     }
 
     private void hacerVinculacion(Alumno alumno, Curso curso) {
         if (curso.getAlumnos().contains(alumno)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "El alumno ya esta inscrito");
+            throw new IllegalStateException("El alumno ya esta inscrito en este curso");
         }
 
         curso.getAlumnos().add(alumno);
-
         alumno.getCursos().add(curso);
-    }
-
-    private AlumnoInscripcionResponseDTO construirDTO(Alumno alumno) {
-        List<Curso> cursosMatriculados = alumno.getCursos();
-
-        BigDecimal totalInversion = calcularInversionTotal(cursosMatriculados);
-        List<CursoInscritoDTO> listadoCursosDto = mapearCursosADto(cursosMatriculados);
-
-        return new AlumnoInscripcionResponseDTO(
-                alumno.getUsername(),
-                alumno.getEmail(),
-                listadoCursosDto,
-                totalInversion
-        );
     }
 
     private BigDecimal calcularInversionTotal(List<Curso> cursos) {
         return cursos.stream()
                 .map(Curso::getPrecio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private List<CursoInscritoDTO> mapearCursosADto(List<Curso> cursos) {
-        return cursos.stream()
-                .map(c -> new CursoInscritoDTO(c.getTitulo(), c.getResumen(), c.getPrecio()))
-                .toList();
     }
 }

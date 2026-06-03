@@ -46,14 +46,28 @@ public class CursoController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/listado")
-    public ResponseEntity<Map<String, Object>> listarCursos(
-            @RequestParam(required = false) String busqueda,
-            @RequestParam(defaultValue = "0") int pagina,
-            @RequestParam(defaultValue = "10") int tamano,
-            @RequestParam(required = false) String ordenacion) {
 
-        Page<CursoVista> paginaResultados = cursoService.buscarCursos(busqueda, pagina, tamano, ordenacion);
+    @GetMapping("/buscar")
+    public ResponseEntity<List<CursoVista>> buscarCursos(@RequestParam String valor) {
+        List<CursoVista> resultados = cursoService.soloBuscar(valor);
+        return ResponseEntity.ok(resultados);
+    }
+
+    @GetMapping("/ordenar")
+    public ResponseEntity<List<CursoVista>> ordenarCursos(
+            @RequestParam(defaultValue = "precio") String campo,
+            @RequestParam(defaultValue = "asc") String direccion) {
+
+        List<CursoVista> resultados = cursoService.soloOrdenar(campo, direccion);
+        return ResponseEntity.ok(resultados);
+    }
+
+    @GetMapping("/paginar")
+    public ResponseEntity<Map<String, Object>> paginarCursos(
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "10") int tamano) {
+
+        Page<CursoVista> paginaResultados = cursoService.soloPaginar(pagina, tamano);
 
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("datos", paginaResultados.getContent());
